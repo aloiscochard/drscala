@@ -1,0 +1,4 @@
+<plugin>
+  <name>drscala</name>
+  <classname>drscala.CompilerPlugin</classname>
+</plugin>
