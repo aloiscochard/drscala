@@ -21,7 +21,7 @@ trait HealthCake {
       def name = "std-lib"
       val diagnostic: PartialFunction[PhaseId, CompilationUnit => Seq[(Position, Message)]] = {
         case "parser" => _.body.collect {
-          case tree@Apply(Select(_, name), _) if name.toString == "asInstanceOf" => 
+          case tree@Select(_, name) if name.toString == "asInstanceOf" => 
             tree.pos -> "There should be a better way than using `asInstanceOf`, what do you think?"
         }
       }
