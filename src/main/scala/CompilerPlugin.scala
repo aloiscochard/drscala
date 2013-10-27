@@ -19,8 +19,10 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
           }.flatten.map(reporter(_))
         }
 
+        trace(s"writer@${unit.source.file.path}=$writer")
         if (Settings.warn || writer.isDefined) {
           val comments = doctors.flatMap(_.diagnostic.lift(phase).toSeq.flatMap(_(unit.asInstanceOf[CompilerPlugin.this.global.CompilationUnit])))
+          trace(comments.mkString("\n"))
           if (Settings.warn) comments.foreach(tupled(unit.warning _))
           writer.foreach(_(comments.map { case (pos, body) => (pos.line -> pos.column) -> body }))
         }
@@ -46,9 +48,12 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
       val RepositoryOwner = new Prefix("gh.repository.owner="); val RepositoryName = new Prefix("gh.repository.name=")
     }
 
+    var debug = false
     var warn = false
     var github: Option[GitHub] = None
   }
+
+  private def trace(message: => String): Unit = if (Settings.debug) { println(message) }
 
   override def processOptions(options: List[String], error: String => Unit) {
     import Settings._
@@ -57,6 +62,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     var repositoryOwner: Option[String] = None; var repositoryName: Option[String] = None
 
     options foreach {
+      case "debug" => Settings.debug = true
       case "warn" => Settings.warn = true
       case GitHub.User(x) => user = Some(x); case GitHub.Password(x) => password = Some(x)
       case GitHub.RepositoryOwner(x) => repositoryOwner = Some(x); case GitHub.RepositoryName(x) => repositoryName = Some(x)
@@ -66,6 +72,9 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     Settings.github = 
       for { u <- user; p <- password; ro <- repositoryOwner; rn <- repositoryName }
       yield Settings.GitHub(Credentials(u, p), RepositoryId(ro, rn))
+
+    trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${System.getProperty("drscala.pr")}""")
+    trace(doctors.toString)
   }
 
   override val optionsHelp: Option[String] = Some("""
@@ -75,5 +84,6 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     |      -gh.password=<password>
     |      -gh.repository.owner=<owner>
     |      -gh.repository.name=<name>
+    |      -debug                             Trace plugin debugging information.
   """.trim.stripMargin)
 }
