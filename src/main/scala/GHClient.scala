@@ -72,7 +72,7 @@ object GHClient {
       comments.foreach { 
         case comment@((line, column), body) => scope.collectFirst { 
           case (sha, xs) => xs.collectFirst { 
-            case (_filename, (start, end)) if (_filename.endsWith(filename)) && line >= start && line <= end => (_filename, sha)
+            case (_filename, (start, end)) if (filename.endsWith(_filename)) && line >= start && line <= end => (_filename, sha)
           }
         }.flatten.foreach { case (filename, sha) =>
           writerByCommit(sha)(filename -> comment)
