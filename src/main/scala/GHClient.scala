@@ -70,11 +70,11 @@ object GHClient {
 
     def apply(filename: FileName) = comments => Future {
       comments.foreach { 
-        case comment@((line, column), body) => scope.collectFirst { 
+        case comment@((line, column), body) => scope.view.flatMap { 
           case (sha, xs) => xs.collectFirst { 
             case (_filename, (start, end)) if (filename.endsWith(_filename)) && line >= start && line <= end => (_filename, sha)
           }
-        }.flatten.foreach { case (filename, sha) =>
+        }.headOption.foreach { case (filename, sha) =>
           writerByCommit(sha)(filename -> comment)
         }
       }
@@ -82,6 +82,4 @@ object GHClient {
 
     def isDefinedAt(x: FileName): Boolean = files.contains(x)
   }
-
 }
-

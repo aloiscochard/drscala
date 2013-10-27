@@ -13,9 +13,10 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
         def writer = Settings.github.flatMap(_.reporter).flatMap { reporter =>
-          reporter.scope.collectFirst { case (_, xs) => 
-            xs.collectFirst { case (filename, _) if unit.source.file.path.endsWith(filename) => filename }
-          }.flatten.map(reporter(_))
+          reporter.scope.view.flatMap { case (_, xs) => 
+            xs.find { case (filename, _) => unit.source.file.path.endsWith(filename) }
+              .map { case (filename, _) => reporter(filename) }
+          }.headOption
         }
 
         trace(s"writer@${unit.source.file.path}=$writer")
