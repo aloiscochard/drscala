@@ -74,6 +74,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
 
     trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${System.getProperty("drscala.pr")}""")
     trace(doctors.map(_.name).mkString(","))
+    trace(s"Scope = ${Settings.github.flatMap(_.reporter).map(_.scope)}")
   }
 
   override val optionsHelp: Option[String] = Some("""
