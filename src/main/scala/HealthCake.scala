@@ -33,17 +33,19 @@ trait HealthCake {
           case tree@Select(_, name) if name.toString == "asInstanceOf" => 
             tree.pos -> "There should be a better way than using `asInstanceOf`, what do you think?"
         }
-        case "typer" => unit => 
-          unit.body.collect {
-            case tree@Select(value, name) if unsafeOnEmptyIterable.contains(name.toString) && value.tpe <:< typeOf[Iterable[Any]] => 
-              tree.pos -> (
-                s"Are you sure the `${value.tpe.typeSymbol.name}` will never be empty?\n" +
-                s"Because calling `$name` might throw an exception in this case."
-              )
+        case "typer" => _.body.collect {
+          case tree@TypeApply(_, xs) if xs.forall(_.tpe =:= typeOf[Nothing]) =>
+            tree.pos -> "I feel a disturbance in the force, the type `Nothing` might have been inferred."
 
-            case tree@Select(value, name) if name.toString == "get" && value.tpe <:< typeOf[Option[Any]] => 
-              tree.pos -> "There is surely a better way than calling `Option.get`, any idea?"
-          }
+          case tree@Select(value, name) if unsafeOnEmptyIterable.contains(name.toString) && value.tpe <:< typeOf[Iterable[Any]] => 
+            tree.pos -> (
+              s"Are you sure the `${value.tpe.typeSymbol.name}` will never be empty?\n" +
+              s"Because calling `$name` might throw an exception in this case."
+            )
+
+          case tree@Select(value, name) if name.toString == "get" && value.tpe <:< typeOf[Option[Any]] => 
+            tree.pos -> "There is surely a better way than calling `Option.get`, any idea?"
+        }
       }
     }
   }
