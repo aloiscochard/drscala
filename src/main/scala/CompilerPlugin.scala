@@ -1,6 +1,5 @@
 package drscala
 
-import Function._
 import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
@@ -23,7 +22,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
         if (Settings.warn || writer.isDefined) {
           val comments = doctors.flatMap(_.diagnostic.lift(phase).toSeq.flatMap(_(unit.asInstanceOf[CompilerPlugin.this.global.CompilationUnit])))
           trace(comments.mkString("\n"))
-          if (Settings.warn) comments.foreach(tupled(unit.warning _))
+          if (Settings.warn) comments.foreach { case (pos, body) => unit.warning(pos, s"$phaseName\n$body") }
           writer.foreach(_(comments.map { case (pos, body) => (pos.line -> pos.column) -> body }))
         }
       }
