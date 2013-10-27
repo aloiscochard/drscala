@@ -44,6 +44,11 @@ object DrScala extends Build {
           case "scalac-plugin.xml"     => MergeStrategy.first
           case x => f(x)
         }
-      }
+      },
+      scalacOptions += "-Xplugin:/home/alois/oss/drscala/plugin/target/scala-2.10/drscala-plugin-assembly-0.1.0-SNAPSHOT.jar",
+      scalacOptions ++= Seq(
+        "warn",
+        "debug"
+      ).map("-P:drscala:" + _)
     ) dependsOn(common)
 }
