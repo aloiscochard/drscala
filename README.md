@@ -22,4 +22,5 @@ I'm DrScala, my goal is to take care of your code.
 
 DrScala can be easily integrated with the jenkins plugin that automate building of pull request.
 
--Ddrscala.pr=${ghprbPullId}
+The compiler plugin will read the env variables `drscala.pr` or `ghprbPullId`,
+the second one being defined by the pull request builder everything should work out of box.

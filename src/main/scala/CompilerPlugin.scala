@@ -39,11 +39,17 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
 
     case class GitHub(credentials: Credentials, repositoryId: RepositoryId) {
-      lazy val pullRequestId = Option(System.getProperty("drscala.pr")).map(_.toInt)
+      lazy val pullRequestId = GitHub.pullRequestId
       lazy val reporter = pullRequestId.flatMap(new GHClient(credentials).report(repositoryId, _))
     }
 
     object GitHub { 
+      def pullRequestId = 
+        Option(System.getProperty("drscala.pr"))
+          .orElse(Option(System.getenv("DRSCALA_PR")))
+          .orElse(Option(System.getenv("ghprbPullId")))
+          .map(_.toInt)
+
       val User = new Prefix("gh.user="); val Password = new Prefix("gh.password=")
       val RepositoryOwner = new Prefix("gh.repository.owner="); val RepositoryName = new Prefix("gh.repository.name=")
     }
@@ -73,7 +79,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
       for { u <- user; p <- password; ro <- repositoryOwner; rn <- repositoryName }
       yield Settings.GitHub(Credentials(u, p), RepositoryId(ro, rn))
 
-    trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${System.getProperty("drscala.pr")}""")
+    trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${GitHub.pullRequestId}""")
     trace(doctors.map(_.name).mkString(","))
     trace(s"Scope = ${Settings.github.flatMap(_.reporter).map(_.scope)}")
   }
