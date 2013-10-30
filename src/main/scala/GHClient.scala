@@ -12,25 +12,25 @@ class GHClient(credentials: GHClient.Credentials) { import GHClient._
 
   private val client = GitHub.connectUsingPassword(credentials.user, credentials.password)
 
-  def report(repositoryId: RepositoryId, pullRequestId: Int): Option[Reporter] =
-    for {
-      repository <- allCatch.opt(client.getRepository(repositoryId))
-      pullRequest <- allCatch.opt(repository.getPullRequest(pullRequestId))
-      compare <- allCatch.opt(repository.getCompare(pullRequest.getBase.getSha, pullRequest.getHead.getSha))
-    } yield {
-      val scope = compare.getCommits.map(commit => repository.getCommit(commit.getSHA1)).flatMap { commit =>
-        commit.getFiles.asScala.flatMap { file =>
-          file.getPatch.split("\n").headOption.map(_.split("\\+")(1).split("@@")(0).trim).map { targetHunk =>
-            val xs = targetHunk.split(",").map(_.toInt)
-            file.getFileName -> (xs(0) -> xs(1))
-          }
-        }.toSeq match {
-          case Nil => None
-          case xs => Some(commit.getSHA1 -> xs)
+  def report(repositoryId: RepositoryId, pullRequestId: Int): Either[Throwable, Reporter] = allCatch.either {
+    val repository = client.getRepository(repositoryId)
+    val pullRequest = repository.getPullRequest(pullRequestId)
+    val compare = repository.getCompare(pullRequest.getBase.getSha, pullRequest.getHead.getSha)
+
+    val scope = compare.getCommits.map(commit => repository.getCommit(commit.getSHA1)).flatMap { commit =>
+      commit.getFiles.asScala.flatMap { file =>
+        file.getPatch.split("\n").headOption.map(_.split("\\+")(1).split("@@")(0).trim).map { targetHunk =>
+          val xs = targetHunk.split(",").map(_.toInt)
+          file.getFileName -> (xs(0) -> xs(1))
         }
+      }.toSeq match {
+        case Nil => None
+        case xs => Some(commit.getSHA1 -> xs)
       }
-      new Reporter(repository, scope)
     }
+
+    new Reporter(repository, scope)
+  }
 }
 
 object GHClient {

@@ -40,7 +40,10 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
 
     case class GitHub(credentials: Credentials, repositoryId: RepositoryId) {
       lazy val pullRequestId = GitHub.pullRequestId
-      lazy val reporter = pullRequestId.flatMap(new GHClient(credentials).report(repositoryId, _))
+      lazy val reporter = pullRequestId.flatMap(new GHClient(credentials).report(repositoryId, _).left.map { throwable =>
+        throwable.printStackTrace()
+        throwable
+      }.right.toOption)
     }
 
     object GitHub { 
