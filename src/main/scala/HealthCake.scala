@@ -1,5 +1,6 @@
 package drscala
 
+import scala.Function._
 import scala.tools.nsc.{Global, Phase}
 
 // Note: Dear Cake, I hate you.
@@ -8,12 +9,22 @@ trait HealthCake {
 
   import global._
 
+  type Column = Int
+  type Line = Int
   type PhaseId = String
+  type Position = (Line, Column)
   type Message = String
 
   sealed abstract class Doctor {
+
+    protected implicit def t2p(tuple: (Tree, Message)) = {
+      val (tree, body) = tuple
+      (tree.pos.line, tree.pos.column) -> body
+    }
+
     def name: String
-    def diagnostic: PartialFunction[PhaseId, CompilationUnit => Seq[(Position, String)]]
+    def diagnostic: PartialFunction[PhaseId, CompilationUnit => Seq[(Position, Message)]] = PartialFunction.empty
+    def examine: Seq[(String, Column => Position)] => Seq[(Position, Message)] = const(Nil)(_)
   }
 
   object Doctor {
@@ -27,29 +38,29 @@ trait HealthCake {
         case DefDef(_, _, _, _, tpt, _) if tpt.exists(_.tpe =:= typeOf[Nothing]) => true
       }
 
-      val diagnostic: PartialFunction[PhaseId, CompilationUnit => Seq[(Position, Message)]] = {
+      override val diagnostic: PartialFunction[PhaseId, CompilationUnit => Seq[(Position, Message)]] = {
         case "parser" => _.body.collect {
           case tree@Ident(name) if name.toString == "$qmark$qmark$qmark" => 
-            tree.pos -> "Oops, an implementation is missing here."
+            tree -> "Oops, an implementation is missing here."
 
           case tree@Apply(Ident(name), _) if name.toString == "println" => 
-            tree.pos -> "There is rarely a good reason to use `println`, is it the case here?"
+            tree -> "There is rarely a good reason to use `println`, is it the case here?"
 
           case tree@Select(_, name) if name.toString == "asInstanceOf" => 
-            tree.pos -> "There should be a better way than using `asInstanceOf`, what do you think?"
+            tree -> "There should be a better way than using `asInstanceOf`, what do you think?"
         }
         case "typer" => _.body.collect {
           case tree if isNothingInferred(tree) =>
-            tree.pos -> "I feel a disturbance in the force, the type `Nothing` might have been inferred."
+            tree -> "I feel a disturbance in the force, the type `Nothing` might have been inferred."
 
           case tree@Select(value, name) if unsafeOnEmptyIterable.contains(name.toString) && value.tpe <:< typeOf[Iterable[Any]] => 
-            tree.pos -> (
+            tree -> (
               s"Are you sure the `${value.tpe.typeSymbol.name}` will never be empty?\n" +
               s"Because calling `$name` might throw an exception in this case."
             )
 
           case tree@Select(value, name) if name.toString == "get" && value.tpe <:< typeOf[Option[Any]] => 
-            tree.pos -> "There is surely a better way than calling `Option.get`, any idea?"
+            tree -> "There is surely a better way than calling `Option.get`, any idea?"
         }
       }
     }

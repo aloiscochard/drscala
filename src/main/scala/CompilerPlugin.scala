@@ -7,12 +7,13 @@ import GHClient.{Credentials, RepositoryId}
 
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import global._
 
-  class Checkup(phase: String, doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends PluginComponent { import global._
-    override val runsAfter = List(phase)
-    override val phaseName = s"drscala.${phase}"
+  trait Checkup extends PluginComponent {
+    import global._
+    def checkup: CompilerPlugin.this.global.CompilationUnit => Seq[(CompilerPlugin.this.Position, String)]
+
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
-        def writer = Settings.github.flatMap(_.reporter).flatMap { reporter =>
+        lazy val writer = Settings.github.flatMap(_.reporter).flatMap { reporter =>
           reporter.scope.view.flatMap { case (_, xs) => 
             xs.find { case (filename, _) => unit.source.file.path.endsWith(filename) }
               .map { case (filename, _) => reporter(filename) }
@@ -21,19 +22,47 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
 
         trace(s"writer@${unit.source.file.path}=$writer")
         if (Settings.warn || writer.isDefined) {
-          val comments = doctors.flatMap(_.diagnostic.lift(phase).toSeq.flatMap(_(unit.asInstanceOf[CompilerPlugin.this.global.CompilationUnit])))
+          // TODO Find a way to avoid casting CompilationUnit due to cake madness.
+          val comments = checkup(unit.asInstanceOf[CompilerPlugin.this.global.CompilationUnit])
+
           trace(comments.mkString("\n"))
-          if (Settings.warn) comments.foreach { case (pos, body) => unit.warning(pos, s"$phaseName\n$body") }
-          writer.foreach(_(comments.map { case (pos, body) => (pos.line -> pos.column) -> body }))
+
+          if (Settings.warn) comments.foreach { case ((line, column), body) => 
+            unit.warning(unit.source.position(line - 1, column - 1), s"$phaseName\n$body")
+          }
+
+          writer.foreach(_(comments.map { case ((line, column), body) => (line -> column) -> body }))
         }
       }
+    }
+  }
+
+  class CheckupDiagnostic(phase: String, doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup {
+    override val runsAfter = List(phase)
+    override val phaseName = s"drscala.${phase}"
+
+    val checkup = (unit: CompilationUnit) =>
+      doctors.flatMap(_.diagnostic.lift(phase).toSeq.flatMap(_(unit)))
+  }
+
+  class CheckupExamine(doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup { 
+    override val runsAfter = List("namer")
+    override val phaseName = "drscala.examine"
+
+    val eof: (String, Column => Position) =  ("EOF", _ => (0, 0))
+
+    val checkup = (unit: CompilationUnit) => {
+      // TODO Optimisation: when processing PR, check only part which are in the diff.
+      val xs = new String(unit.source.file.toByteArray).split("\n")
+        .zipWithIndex.map { case (k, v) => k -> ((x: Int) => (v + 1, x)) }
+      doctors.flatMap(_.examine(xs :+ eof))
     }
   }
 
   val name = "drscala"
   val description = "A doctor for your code"
   val doctors = Seq(new Doctor.StdLib)
-  val components = List("parser", "typer").map(new Checkup(_, doctors))
+  val components = new CheckupExamine(doctors) :: List("parser", "typer").map(new CheckupDiagnostic(_, doctors))
 
   object Settings {
     class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
