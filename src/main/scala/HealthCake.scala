@@ -63,6 +63,21 @@ trait HealthCake {
             tree -> "There is surely a better way than calling `Option.get`, any idea?"
         }
       }
+
+      override val examine: Seq[(String, Column => Position)] => Seq[(Position, Message)] = xs => {
+        def emptyLines(lines: Seq[(String, Column => Position)]): Seq[(Position, Message)] = {
+          val (count, xs) = lines.foldLeft((0, Seq.empty[Position])) { case ((count, xs), (line, pos)) =>
+            if (line.trim.isEmpty) (count + 1) ->  xs
+            else 0 -> { if (count > 1) (pos(1) +: xs ) else xs }
+          }
+          xs.map { case (line, column) => (line - 1, column) -> "Are these extra empty lines really needed?" }
+        }
+
+        xs.collect { 
+          case (code, pos) if code.trim.endsWith(";") =>
+            pos(code.length) -> "That `;` at the end of the line is unnecessary."
+        } ++ emptyLines(xs)
+      }
     }
   }
 }
