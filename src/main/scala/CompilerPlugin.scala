@@ -59,10 +59,13 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     }
   }
 
+  val active = ! Settings.disabled
   val name = "drscala"
   val description = "A doctor for your code"
   val doctors = Seq(new Doctor.StdLib)
-  val components = new CheckupExamine(doctors) :: List("parser", "typer").map(new CheckupDiagnostic(_, doctors))
+
+  val components = 
+    if (active) new CheckupExamine(doctors) :: List("parser", "typer").map(new CheckupDiagnostic(_, doctors)) else Nil
 
   object Settings {
     class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
@@ -87,8 +90,13 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
     }
 
     var debug = false
-    var warn = false
+
+    val disabled = Option(System.getProperty("drscala.disable"))
+      .orElse(Option(System.getenv("DRSCALA_DISABLE")))
+      .fold(false)(_.toLowerCase == "true")
+
     var github: Option[GitHub] = None
+    var warn = false
   }
 
   private def trace(message: => String): Unit = if (Settings.debug) { println(message) }
