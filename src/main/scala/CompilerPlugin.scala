@@ -4,8 +4,10 @@ import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
 import GHClient.{Credentials, RepositoryId}
+import doctors._
 
-class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import global._
+class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
+    with StdLibComponent { import global._
 
   trait Checkup extends PluginComponent {
     import global._
@@ -62,7 +64,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake { import
   val active = ! Settings.disabled
   val name = "drscala"
   val description = "A doctor for your code"
-  val doctors = Seq(new Doctor.StdLib)
+  val doctors = Seq(new StdLib)
 
   val components = 
     if (active) new CheckupExamine(doctors) :: List("parser", "typer").map(new CheckupDiagnostic(_, doctors)) else Nil
