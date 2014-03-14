@@ -1,9 +1,6 @@
 package drscala
 
-import scala.concurrent.Future
-import scala.util.control.Exception._
-
-import akka.actor.ActorSystem
+import scala.concurrent.{ExecutionContext, Future}
 
 import github._
 import Client._
@@ -19,11 +16,11 @@ class Reporter(client: Client, pr: PR, val scope: Scope) extends PartialFunction
   lazy val writerByCommit = Future.sequence(scope.map { case (commit, _) => 
     // TODO Validate commits ordering
     client.comments(commit).map { comments =>
-      val write: ((FileName, Comment)) => Unit = _ match {
+      val write: ((FileName, CommentAdd)) => Unit = _ match {
         case (filename, comment) =>
           import comment._
-          if (!comments.exists { c => comment.line == line && comment.body == body }) {
-            client.comment(pr, Comment(UserRef(client.credentials.user), filename, body, line, line))
+          if (!comments.exists { c => c.line == line && c.body == body }) {
+            client.comment(pr, comment).onFailure { case t: Throwable => t.printStackTrace }
           }
       }
       (commit, write)
@@ -39,7 +36,7 @@ class Reporter(client: Client, pr: PR, val scope: Scope) extends PartialFunction
         }
       }.headOption.foreach { case (filename, commit) =>
         import report._
-        writerByCommit(commit)(filename -> Comment(UserRef(client.credentials.user), filename, body, line, line))
+        writerByCommit(commit)(filename -> CommentAdd(commit.id, body, filename, line))
       }
     }
   }
@@ -50,14 +47,10 @@ class Reporter(client: Client, pr: PR, val scope: Scope) extends PartialFunction
 object Reporter {
   case class Report(body: String, column: Column, line: Line)
 
-  def apply(credentials: Credentials, repositoryId: RepositoryId, pullRequestId: Int)(implicit as: ActorSystem): Either[Throwable, Reporter] = allCatch.either {
+  def apply(credentials: Credentials, repositoryId: RepositoryId, pullRequestId: Int)(implicit ec: ExecutionContext): Future[Reporter] = {
     val client = new Client(credentials)
     val pr = new Client.PR(repositoryId, pullRequestId)
-
-    import scala.concurrent.Await
-    import scala.concurrent.duration._
-
-    new Reporter(client, pr, Await.result(client.scope(pr), Duration.Inf))
+    client.scope(pr).map(new Reporter(client, pr, _))
   }
 }
 

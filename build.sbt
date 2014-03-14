@@ -11,9 +11,8 @@ scalaVersion := "2.10.3"
 description := "A doctor for your code"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-actor" % "2.3.0",
-  "io.spray" % "spray-client" % "1.3.0",
-  "io.spray" %% "spray-json" % "1.2.5"
+  "net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
+  "io.argonaut" %% "argonaut" % "6.0.3"
 )
 
 libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)

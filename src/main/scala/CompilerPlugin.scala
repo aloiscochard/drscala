@@ -1,22 +1,18 @@
 package drscala
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.Exception._
 import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
-
-import akka.actor.ActorSystem
 
 import github.{Client, Credentials, RepositoryId}
 
 import doctors._
 
-object CompilerPlugin {
-  implicit val as = ActorSystem()
-}
-
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
     with StdLibComponent { import global._
 
-  import CompilerPlugin._
+  implicit val ec: ExecutionContext = ExecutionContext.global
 
   trait Checkup extends PluginComponent {
     import global._
@@ -24,7 +20,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
-        lazy val writer = Settings.github.flatMap(_.reporter).flatMap { reporter =>
+        lazy val writer = reporterOption.flatMap { reporter =>
           reporter.scope.view.flatMap { case (_, xs) => 
             xs.find { case (filename, _) => unit.source.file.path.endsWith(filename) }
               .map { case (filename, _) => reporter(filename) }
@@ -83,10 +79,6 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     case class GitHub(credentials: Credentials, repositoryId: RepositoryId) {
       lazy val pullRequestId = GitHub.pullRequestId
-      lazy val reporter = pullRequestId.flatMap(Reporter(credentials, repositoryId, _).left.map { throwable =>
-        throwable.printStackTrace()
-        throwable
-      }.right.toOption)
     }
 
     object GitHub { 
@@ -110,7 +102,22 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
     var warn = false
   }
 
+  private var reporterOption: Option[Reporter] = None
+
   private def trace(message: => String): Unit = if (Settings.debug) { println(message) }
+
+  private def reporterInit: Option[Reporter] = Settings.github.flatMap { github =>
+    github.pullRequestId.flatMap { prId =>
+      allCatch.either {
+        import scala.concurrent.Await
+        import scala.concurrent.duration._
+        Await.result(Reporter(github.credentials, github.repositoryId, prId), Duration.Inf)
+      }.left.map { throwable =>
+        throwable.printStackTrace()
+        throwable
+      }.right.toOption
+    }
+  }
 
   override def processOptions(options: List[String], error: String => Unit) {
     import Settings._
@@ -132,7 +139,9 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${GitHub.pullRequestId}""")
     trace(doctors.map(_.name).mkString(","))
-    trace(s"Scope = ${Settings.github.flatMap(_.reporter).map(_.scope)}")
+
+    reporterOption = reporterInit
+    trace(s"Scope = ${reporterOption.map(_.scope)}")
   }
 
   override val optionsHelp: Option[String] = Some("""
