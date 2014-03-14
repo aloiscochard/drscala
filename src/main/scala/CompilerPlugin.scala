@@ -3,11 +3,20 @@ package drscala
 import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
-import GHClient.{Credentials, RepositoryId}
+import akka.actor.ActorSystem
+
+import github.{Client, Credentials, RepositoryId}
+
 import doctors._
+
+object CompilerPlugin {
+  implicit val as = ActorSystem()
+}
 
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
     with StdLibComponent { import global._
+
+  import CompilerPlugin._
 
   trait Checkup extends PluginComponent {
     import global._
@@ -33,7 +42,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
             unit.warning(unit.source.position(line - 1, column - 1), s"$phaseName\n$body")
           }
 
-          writer.foreach(_(comments.map { case ((line, column), body) => (line -> column) -> body }))
+          writer.foreach(_(comments.map { case ((line, column), body) => Reporter.Report(body, column, line)}))
         }
       }
     }
@@ -74,7 +83,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     case class GitHub(credentials: Credentials, repositoryId: RepositoryId) {
       lazy val pullRequestId = GitHub.pullRequestId
-      lazy val reporter = pullRequestId.flatMap(new GHClient(credentials).report(repositoryId, _).left.map { throwable =>
+      lazy val reporter = pullRequestId.flatMap(Reporter(credentials, repositoryId, _).left.map { throwable =>
         throwable.printStackTrace()
         throwable
       }.right.toOption)
