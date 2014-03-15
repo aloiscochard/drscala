@@ -31,7 +31,7 @@ trait WartComponent { self: HealthCake =>
   object WartDoctor {
     val warts: Map[String, WartTraverser] = 
       PackageObjects[WartTraverser]("org.brianmckenna.wartremover.warts")
-        .map(x => x.getClass.getSimpleName.toLowerCase -> x).toMap
+        .map(x => x.getClass.getSimpleName.toLowerCase.reverse.tail.reverse -> x).toMap
 
     def apply(names: Seq[String]): WartDoctor = new Doctor.Sementic("warts") with WartDoctor {
       val traversers: Seq[WartTraverser] = names.flatMap(warts.get)
