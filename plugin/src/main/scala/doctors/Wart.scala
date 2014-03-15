@@ -29,14 +29,15 @@ trait WartComponent { self: HealthCake =>
   }
 
   object WartDoctor {
-    // TODO Once common module created: PackageObjects[WartTraverser]("org.brianmckenna.wartremover.warts").map(...) 
-    val warts: Map[String, WartTraverser] = Map.empty
+    val warts: Map[String, WartTraverser] = 
+      PackageObjects[WartTraverser]("org.brianmckenna.wartremover.warts")
+        .map(x => x.getClass.getSimpleName.toLowerCase -> x).toMap
 
     def apply(names: Seq[String]): WartDoctor = new Doctor.Sementic("warts") with WartDoctor {
       val traversers: Seq[WartTraverser] = names.flatMap(warts.get)
     }
 
     // TODO Introduce smart generic format for opt-in/opt-out
-    def fromString(names: String): WartDoctor = apply(names.split("\\+"))
+    def fromString(names: String): WartDoctor = apply(names.split("\\+").map(_.toLowerCase))
   }
 }
