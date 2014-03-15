@@ -11,6 +11,7 @@ scalaVersion := "2.10.3"
 description := "A doctor for your code"
 
 libraryDependencies ++= Seq(
+  "org.brianmckenna" %% "wartremover" % "0.7",
   "net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
   "io.argonaut" %% "argonaut" % "6.0.3"
 )
@@ -30,3 +31,10 @@ artifact in (Compile, assembly) ~= { art =>
 }
 
 addArtifact(artifact in (Compile, assembly), assembly)
+
+mergeStrategy in assembly <<= (mergeStrategy in assembly) { (f) =>
+  {
+    case "scalac-plugin.xml"     => MergeStrategy.first
+    case x => f(x)
+  }
+}

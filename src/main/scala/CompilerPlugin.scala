@@ -11,7 +11,7 @@ import github.{Client, Credentials, RepositoryId}
 import doctors._
 
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
-    with StdComponent { import global._
+    with StdComponent with WartComponent { import global.{Lazy => _, _}
 
   implicit val ec: ExecutionContext = ExecutionContext.global
 
@@ -45,14 +45,14 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
     }
   }
 
-  class CheckupSementic(phase: PhaseId, doctors: Seq[Doctor.Sementic], val global: Global = CompilerPlugin.this.global) extends Checkup {
+  class CheckupSementic(phase: PhaseId, doctors: Lazy[Seq[Doctor.Sementic]], val global: Global = CompilerPlugin.this.global) extends Checkup {
     override val runsAfter = List(phase.name)
     override val phaseName = s"drscala.${phase}"
 
-    val checkup = (unit: CompilationUnit) => doctors.flatMap(_.apply(phase)(unit))
+    val checkup = (unit: CompilationUnit) => doctors.value.flatMap(_.apply(phase)(unit))
   }
 
-  class CheckupExamine(doctors: Seq[Doctor.Style], val global: Global = CompilerPlugin.this.global) extends Checkup { 
+  class CheckupExamine(doctors: Lazy[Seq[Doctor.Style]], val global: Global = CompilerPlugin.this.global) extends Checkup { 
     override val runsAfter = List("namer")
     override val phaseName = "drscala.examine"
 
@@ -62,20 +62,22 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       // TODO Optimisation: when processing PR, check only part which are in the diff.
       val xs = new String(unit.source.file.toByteArray).split("\n")
         .zipWithIndex.map { case (k, v) => k -> ((x: Int) => (v + 1, x)) }
-      doctors.flatMap(_.apply(xs :+ eof))
+      doctors.value.flatMap(_.apply(xs :+ eof))
     }
   }
 
   val active = ! Settings.disabled
   val name = "drscala"
   val description = "A doctor for your code"
-  val doctors = Seq(StdLib, StdStyle)
 
-  val components = {
-    def sementics = doctors.collect { case x: Doctor.Sementic => x}
-    def styles = doctors.collect { case x: Doctor.Style => x}
-    if (active) new CheckupExamine(styles) :: PhaseId.values.map(new CheckupSementic(_, sementics)).toList else Nil
-  }
+  val doctors = Lazy(Seq(StdLib, StdStyle) ++ Settings.warts.map(WartDoctor.fromString).toSeq)
+  val sementics = doctors.map(_.collect { case x: Doctor.Sementic => x})
+  val styles = doctors.map(_.collect { case x: Doctor.Style => x})
+
+  val components = 
+    if (active) 
+      new CheckupExamine(styles) :: PhaseId.values.map(new CheckupSementic(_, sementics)).toList
+    else Nil
 
   object Settings {
     case class GitHub(credentials: Credentials, repositoryId: RepositoryId) {
@@ -93,6 +95,8 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       val RepositoryOwner = new Prefix("gh.repository.owner="); val RepositoryName = new Prefix("gh.repository.name=")
     }
 
+    val Warts = new Prefix("warts=")
+
     var debug = false
 
     val disabled = Option(System.getProperty("drscala.disable"))
@@ -100,6 +104,9 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       .fold(false)(_.toLowerCase == "true")
 
     var github: Option[GitHub] = None
+
+    var warts: Option[String] = None
+
     var warn = false
   }
 
@@ -131,6 +138,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       case "warn" => Settings.warn = true
       case GitHub.User(x) => user = Some(x); case GitHub.Password(x) => password = Some(x)
       case GitHub.RepositoryOwner(x) => repositoryOwner = Some(x); case GitHub.RepositoryName(x) => repositoryName = Some(x)
+      case Warts(names) => warts = Some(names)
       case option => error("Option not understood: " + option)
     }
 
@@ -139,7 +147,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       yield Settings.GitHub(Credentials(u, p), RepositoryId(ro, rn))
 
     trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${GitHub.pullRequestId}""")
-    trace(doctors.map(_.name).mkString(","))
+    trace(doctors.value.map(_.name).mkString(","))
 
     reporterOption = reporterInit
     trace(s"Scope = ${reporterOption.map(_.scope)}")
