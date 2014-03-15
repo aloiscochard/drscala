@@ -147,7 +147,8 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       yield Settings.GitHub(Credentials(u, p), RepositoryId(ro, rn))
 
     trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${GitHub.pullRequestId}""")
-    trace(doctors.value.map(_.name).mkString(","))
+    trace(s"Warts: $warts")
+    trace("Doctors" + doctors.value.map(_.name).mkString(","))
 
     reporterOption = reporterInit
     trace(s"Scope = ${reporterOption.map(_.scope)}")
