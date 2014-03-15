@@ -10,6 +10,7 @@ package object github {
   type FileName = String
   type Line = Int
   type Range = (Int, Int)
+  // TODO Lazy loaded scope = Seq[(Client.Commit, Future[Seq[(FileName, Range)]])] 
   type Scope = Seq[(Client.Commit, Seq[(FileName, Range)])]
 
   object Range {
