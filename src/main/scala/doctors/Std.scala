@@ -1,12 +1,11 @@
 package drscala
 package doctors
 
-trait StdLibComponent { self: HealthCake =>
+trait StdComponent { self: HealthCake =>
   import self.global._
+  import PhaseId._
 
-  class StdLib extends Doctor {
-    def name = "std-lib"
-
+  object StdLib extends Doctor.Sementic("std-lib") {
     val unsafeOnEmptyIterable = Seq("head", "last", "reduce", "reduceLeft", "reduceRight")
 
     def isNothingInferred(tree: Tree) = PartialFunction.cond(tree) {
@@ -14,7 +13,7 @@ trait StdLibComponent { self: HealthCake =>
       case DefDef(_, _, _, _, tpt, _) if tpt.exists(_.tpe =:= typeOf[Nothing]) => true
     }
 
-    override def diagnostic = {
+    override def apply = {
       case Parser => _.body.collect {
         case tree@Ident(name) if name.toString == "$qmark$qmark$qmark" => 
           tree -> "Oops, an implementation is missing here."
@@ -39,8 +38,10 @@ trait StdLibComponent { self: HealthCake =>
           tree -> "There is surely a better way than calling `Option.get`, any idea?"
       }
     }
+  }
 
-    override val examine: Seq[(String, Column => Position)] => Seq[(Position, Message)] = xs => {
+  object StdStyle extends Doctor.Style("std-style") {
+    override val apply: Seq[(String, Column => Position)] => Seq[(Position, Message)] = xs => {
       def emptyLines(lines: Seq[(String, Column => Position)]): Seq[(Position, Message)] = {
         val (count, xs) = lines.foldLeft((0, Seq.empty[Position])) { case ((count, xs), (line, pos)) =>
           if (line.trim.isEmpty) (count + 1) ->  xs

@@ -1,5 +1,6 @@
 package drscala
 
+import scala.PartialFunction.cond
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.Exception._
 import scala.tools.nsc.{Global, Phase}
@@ -10,7 +11,7 @@ import github.{Client, Credentials, RepositoryId}
 import doctors._
 
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
-    with StdLibComponent { import global._
+    with StdComponent { import global._
 
   implicit val ec: ExecutionContext = ExecutionContext.global
 
@@ -44,15 +45,14 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
     }
   }
 
-  class CheckupDiagnostic(phase: PhaseId, doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup {
+  class CheckupSementic(phase: PhaseId, doctors: Seq[Doctor.Sementic], val global: Global = CompilerPlugin.this.global) extends Checkup {
     override val runsAfter = List(phase.name)
     override val phaseName = s"drscala.${phase}"
 
-    val checkup = (unit: CompilationUnit) =>
-      doctors.flatMap(_.diagnostic(phase)(unit))
+    val checkup = (unit: CompilationUnit) => doctors.flatMap(_.apply(phase)(unit))
   }
 
-  class CheckupExamine(doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup { 
+  class CheckupExamine(doctors: Seq[Doctor.Style], val global: Global = CompilerPlugin.this.global) extends Checkup { 
     override val runsAfter = List("namer")
     override val phaseName = "drscala.examine"
 
@@ -62,17 +62,20 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       // TODO Optimisation: when processing PR, check only part which are in the diff.
       val xs = new String(unit.source.file.toByteArray).split("\n")
         .zipWithIndex.map { case (k, v) => k -> ((x: Int) => (v + 1, x)) }
-      doctors.flatMap(_.examine(xs :+ eof))
+      doctors.flatMap(_.apply(xs :+ eof))
     }
   }
 
   val active = ! Settings.disabled
   val name = "drscala"
   val description = "A doctor for your code"
-  val doctors = Seq(new StdLib)
+  val doctors = Seq(StdLib, StdStyle)
 
-  val components = 
-    if (active) new CheckupExamine(doctors) :: PhaseId.values.map(new CheckupDiagnostic(_, doctors)).toList else Nil
+  val components = {
+    def sementics = doctors.collect { case x: Doctor.Sementic => x}
+    def styles = doctors.collect { case x: Doctor.Style => x}
+    if (active) new CheckupExamine(styles) :: PhaseId.values.map(new CheckupSementic(_, sementics)).toList else Nil
+  }
 
   object Settings {
     class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
