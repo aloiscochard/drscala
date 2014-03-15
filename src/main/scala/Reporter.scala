@@ -6,6 +6,7 @@ import github._
 import Client._
 
 // TODO Refactor this ugly animal
+// TODO Improve laziness by having Reporter.apply to return a Reporter, and have the Future in Reporter (Future[Scope])
 
 class Reporter(client: Client, pr: PR, val scope: Scope) extends PartialFunction[FileName, Seq[Reporter.Report] => Future[Unit]] {
   import scala.concurrent.ExecutionContext.Implicits.global
