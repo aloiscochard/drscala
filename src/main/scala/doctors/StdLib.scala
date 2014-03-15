@@ -14,8 +14,8 @@ trait StdLibComponent { self: HealthCake =>
       case DefDef(_, _, _, _, tpt, _) if tpt.exists(_.tpe =:= typeOf[Nothing]) => true
     }
 
-    override val diagnostic: PartialFunction[PhaseId, CompilationUnit => Seq[(Position, Message)]] = {
-      case "parser" => _.body.collect {
+    override def diagnostic = {
+      case Parser => _.body.collect {
         case tree@Ident(name) if name.toString == "$qmark$qmark$qmark" => 
           tree -> "Oops, an implementation is missing here."
 
@@ -25,7 +25,7 @@ trait StdLibComponent { self: HealthCake =>
         case tree@Select(_, name) if name.toString == "asInstanceOf" => 
           tree -> "There should be a better way than using `asInstanceOf`, what do you think?"
       }
-      case "typer" => _.body.collect {
+      case Typer => _.body.collect {
         case tree if isNothingInferred(tree) =>
           tree -> "I feel a disturbance in the force, the type `Nothing` might have been inferred."
 

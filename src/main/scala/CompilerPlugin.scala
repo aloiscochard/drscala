@@ -44,12 +44,12 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
     }
   }
 
-  class CheckupDiagnostic(phase: String, doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup {
-    override val runsAfter = List(phase)
+  class CheckupDiagnostic(phase: PhaseId, doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup {
+    override val runsAfter = List(phase.name)
     override val phaseName = s"drscala.${phase}"
 
     val checkup = (unit: CompilationUnit) =>
-      doctors.flatMap(_.diagnostic.lift(phase).toSeq.flatMap(_(unit)))
+      doctors.flatMap(_.diagnostic(phase)(unit))
   }
 
   class CheckupExamine(doctors: Seq[Doctor], val global: Global = CompilerPlugin.this.global) extends Checkup { 
@@ -72,7 +72,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
   val doctors = Seq(new StdLib)
 
   val components = 
-    if (active) new CheckupExamine(doctors) :: List("parser", "typer").map(new CheckupDiagnostic(_, doctors)) else Nil
+    if (active) new CheckupExamine(doctors) :: PhaseId.values.map(new CheckupDiagnostic(_, doctors)).toList else Nil
 
   object Settings {
     class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
