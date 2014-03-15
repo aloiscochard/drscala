@@ -11,9 +11,23 @@ object DrScala extends Build {
     description := "A doctor for your code"
   )
 
-  lazy val plugin = Project(
-    id   = "drscala",
+  lazy val root = Project(
+    id = "root",
     base = file("."),
+    aggregate = Seq(common, plugin)
+  )
+
+  lazy val common = Project(
+    id   = "drscala-common",
+    base = file("common"),
+    settings = sharedSettings
+  ) settings (
+    libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
+  )
+
+  lazy val plugin = Project(
+    id   = "drscala-plugin",
+    base = file("plugin"),
     settings = sharedSettings ++ assemblySettings) settings (
       libraryDependencies ++= Seq(
         "org.brianmckenna" %% "wartremover" % "0.7",
@@ -31,5 +45,5 @@ object DrScala extends Build {
           case x => f(x)
         }
       }
-    )
+    ) dependsOn(common)
 }
