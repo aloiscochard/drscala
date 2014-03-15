@@ -78,8 +78,6 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
   }
 
   object Settings {
-    class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
-
     case class GitHub(credentials: Credentials, repositoryId: RepositoryId) {
       lazy val pullRequestId = GitHub.pullRequestId
     }
