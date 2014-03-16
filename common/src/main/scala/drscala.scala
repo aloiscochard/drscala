@@ -4,6 +4,7 @@ package object drscala {
   }
 
   class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
+  class Suffix(value: String) { def unapply(xs: String): Option[String] = if (xs.endsWith(value)) Some(xs.take(xs.size - value.size)) else None }
 
   trait Lazy[A] { self =>
     protected def get: A
