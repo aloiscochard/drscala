@@ -5,6 +5,15 @@ object Selection {
   sealed abstract class Exp[A] extends (Seq[A] => Seq[A]) {
     import Exp._, Select._
 
+    def contains(that: A): Boolean = this match {
+      case All() => true
+      case None() => false
+      case Select(mode, diff) => mode match {
+        case Inclusive => diff.contains(that)
+        case Exclusive => !diff.contains(that)
+      }
+    }
+
     def map[B](f: A => B): Exp[B] = this match {
       case All() => All()
       case None() => None()

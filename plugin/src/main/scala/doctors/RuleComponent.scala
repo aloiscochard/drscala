@@ -9,14 +9,11 @@ trait RuleComponent { self: HealthCake =>
 
   object RuleDoctor {
     def fromRuleSet(rs: RuleSet): Selection.Exp[String] => Seq[Doctor] = exp => {
-      val rules = rs.rules.map(x => x.name.toLowerCase -> x).toMap
-      val actives = exp.map(_.toLowerCase)(rules.keys.toSeq).map(rules(_))
+      val expLow = exp.map(_.toLowerCase)
+      val rules = rs.rules.filter(x => expLow.contains(x.name.toLowerCase))
 
-      println("*" * 80)
-      println(actives)
-
-      val sementics = actives.collect { case rule: Rule.Sementic => rule }
-      val styles = actives.collect { case rule: Rule.Style => rule }
+      val sementics = rules.collect { case rule: Rule.Sementic => rule }
+      val styles = rules.collect { case rule: Rule.Style => rule }
 
       val sementic = sementics match {
         case Nil => None
