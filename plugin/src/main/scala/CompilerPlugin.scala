@@ -72,7 +72,16 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
   val description = "A doctor for your code"
 
   val doctors = Lazy {
-    (ruleSets.values.flatMap(RuleDoctor.fromRuleSet(_)(Exp.All())) ++ Settings.warts.flatMap(_.nonEmpty).map(WartDoctor.fromExp)).toSeq
+    def rules = Settings.rules.nonEmpty.map { actives =>
+      val xs = ruleSets.filterKeys(actives.contains)
+      ruleSets.flatMap { case (name, rs) => 
+        RuleDoctor.fromRuleSet(rs)(Settings.ruleSets.getOrElse(name, Exp.All())) 
+      }
+    }.getOrElse(Nil)
+
+    def warts = Settings.warts.nonEmpty.map(WartDoctor.fromExp).toSeq
+
+    (rules ++ warts).toSeq
   }
 
   val sementics = Lazy(doctors.value.collect { case x: Doctor.Sementic => x})
@@ -99,7 +108,19 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       val RepositoryOwner = new Prefix("gh.repository.owner="); val RepositoryName = new Prefix("gh.repository.name=")
     }
 
+    val Rules = new Prefix("rules=")
     val Warts = new Prefix("warts=")
+
+    object RuleSet {
+      val prefix = new Prefix("rules.")
+
+      def unapply(s: String): Option[(String, String)] = prefix.unapply(s).flatMap { s =>
+        s.split("=") match {
+          case Array(set, exp) => Some(set -> exp)
+          case _ => None
+        }
+      }
+    }
 
     var debug = false
 
@@ -109,7 +130,9 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     var github: Option[GitHub] = None
 
-    var warts: Option[Exp[String]] = Some(Exp.include(Seq("Any2StringAdd", "Null", "Var")))
+    var rules: Exp[String] = Exp.All()
+    var ruleSets: Map[String, Exp[String]] = Map.empty
+    var warts: Exp[String] = Exp.include(Seq("Any2StringAdd", "Null", "Var"))
 
     var warn = false
   }
@@ -132,20 +155,28 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
   }
 
   override def processOptions(options: List[String], error: String => Unit) {
-    import Settings._
+    import Settings.GitHub
 
     var user: Option[String] = None; var password: Option[String] = None
     var repositoryOwner: Option[String] = None; var repositoryName: Option[String] = None
+
+    def parseExp(exp: String)(success: Exp[String] => Unit)(error: String => Unit): Unit =
+      Selection.Exp.Parser.parse[String](exp) match {
+        case Right(exp) => success(exp)
+        case Left(msg) => error(msg)
+      }
+
+    def parseError(name: String): String => Unit = msg => error(s"Error while parsing `$name`: $msg")
+    def parseSelect(name: String, exp: String)(success: Exp[String] => Unit) = parseExp(exp)(success)(parseError(name))
 
     options foreach {
       case "debug" => Settings.debug = true
       case "warn" => Settings.warn = true
       case GitHub.User(x) => user = Some(x); case GitHub.Password(x) => password = Some(x)
       case GitHub.RepositoryOwner(x) => repositoryOwner = Some(x); case GitHub.RepositoryName(x) => repositoryName = Some(x)
-      case Warts(names) => Selection.Exp.Parser.parse[String](names) match {
-        case Right(exp) => warts = Some(exp)
-        case Left(msg) => error("Error while parsing `warts`: $msg")
-      }
+      case Settings.Rules(x) => parseSelect("rules", x) { exp => Settings.rules = exp } 
+      case Settings.RuleSet(set, x) => parseSelect(set, x) { exp => Settings.ruleSets = Settings.ruleSets + (set -> exp) }
+      case Settings.Warts(x) => parseSelect("warts", x) { exp => Settings.warts = exp }
       case option => error("Option not understood: " + option)
     }
 
@@ -154,7 +185,9 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       yield Settings.GitHub(Credentials(u, p), RepositoryId(ro, rn))
 
     trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${GitHub.pullRequestId}""")
-    trace(s"Warts: $warts")
+    trace(s"Rules: ${Settings.rules}")
+    trace(s"RuleSets: ${Settings.ruleSets}")
+    trace(s"Warts: ${Settings.warts}")
     trace(s"Doctors: ${doctors.value.map(_.name).mkString(",")}")
 
     reporterOption = reporterInit
@@ -167,7 +200,9 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
     |      -gh.password=<password>
     |      -gh.repository.owner=<owner>
     |      -gh.repository.name=<name>
-    |      -warts=<pattern>                   
+    |      -rules=<pattern>                   Select rule sets.
+    |      -rules.<ruleset>=<pattern>         Select rules for a given rule set.
+    |      -warts=<pattern>                   Select warts (from Wartremover).
     |      -warn                              Generate compiler warnings.
     |      -debug                             Trace plugin debugging information.
   """.trim.stripMargin)
