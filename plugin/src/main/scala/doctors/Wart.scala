@@ -7,6 +7,13 @@ trait WartComponent { self: HealthCake =>
   import self.global._
   import PhaseId._
 
+  val IsDisabled = new Suffix(" is disabled")
+
+  def format(message: String): String = message match {
+    case IsDisabled(what) => s"Couldn't you avoid using `$what` here?"
+    case message => message
+  }
+
   trait WartDoctor extends Doctor.Sementic {
     def traversers: Seq[WartTraverser]
 
@@ -18,7 +25,7 @@ trait WartComponent { self: HealthCake =>
             new WartUniverse {
               import scala.reflect.internal.util.{Position => RPosition}
               val universe: global.type = self.global
-              def error(pos: RPosition, message: String) = xs = (pos.line, pos.column) -> message :: xs
+              def error(pos: RPosition, message: String) = xs = (pos.line, pos.column) -> format(message) :: xs
               def warning(pos: RPosition, message: String) = error(pos, message)
             }
           )(unit.body)
