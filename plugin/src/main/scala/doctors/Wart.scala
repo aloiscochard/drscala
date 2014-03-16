@@ -37,7 +37,7 @@ trait WartComponent { self: HealthCake =>
       val traversers: Seq[WartTraverser] = names.flatMap(warts.get)
     }
 
-    // TODO Introduce smart generic format for opt-in/opt-out
-    def fromString(names: String): WartDoctor = apply(names.split("\\+").map(_.toLowerCase))
+    def fromExp(exp: Selection.Exp[String]): WartDoctor = 
+      apply(exp.map(_.toLowerCase).apply(warts.keys.toSeq))
   }
 }

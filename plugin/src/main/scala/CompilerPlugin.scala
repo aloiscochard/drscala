@@ -7,8 +7,8 @@ import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
 import github.{Client, Credentials, RepositoryId}
-
 import doctors._
+import Selection._
 
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
     with StdComponent with WartComponent { import global.{Lazy => _, _}
@@ -70,7 +70,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
   val name = "drscala"
   val description = "A doctor for your code"
 
-  val doctors = Lazy(Seq(StdLib, StdStyle) ++ Settings.warts.map(WartDoctor.fromString).toSeq)
+  val doctors = Lazy(Seq(StdLib, StdStyle) ++ Settings.warts.flatMap(_.nonEmpty).map(WartDoctor.fromExp).toSeq)
   val sementics = doctors.map(_.collect { case x: Doctor.Sementic => x})
   val styles = doctors.map(_.collect { case x: Doctor.Style => x})
 
@@ -105,7 +105,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     var github: Option[GitHub] = None
 
-    var warts: Option[String] = None
+    var warts: Option[Exp[String]] = Some(Exp.include(Seq("Any2StringAdd", "Null", "Var")))
 
     var warn = false
   }
@@ -138,7 +138,10 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
       case "warn" => Settings.warn = true
       case GitHub.User(x) => user = Some(x); case GitHub.Password(x) => password = Some(x)
       case GitHub.RepositoryOwner(x) => repositoryOwner = Some(x); case GitHub.RepositoryName(x) => repositoryName = Some(x)
-      case Warts(names) => warts = Some(names)
+      case Warts(names) => Selection.Exp.Parser.parse[String](names) match {
+        case Right(exp) => warts = Some(exp)
+        case Left(msg) => error("Error while parsing `warts`: $msg")
+      }
       case option => error("Option not understood: " + option)
     }
 
