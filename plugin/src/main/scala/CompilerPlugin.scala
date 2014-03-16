@@ -163,11 +163,12 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
   override val optionsHelp: Option[String] = Some("""
     |  -P:drscala:
-    |      -warn                              Generate compiler warnings.
-    |      -gh.user=<user>
+    |      -gh.user=<user>                    
     |      -gh.password=<password>
     |      -gh.repository.owner=<owner>
     |      -gh.repository.name=<name>
+    |      -warts=<pattern>                   
+    |      -warn                              Generate compiler warnings.
     |      -debug                             Trace plugin debugging information.
   """.trim.stripMargin)
 }
