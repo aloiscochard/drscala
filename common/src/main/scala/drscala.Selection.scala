@@ -71,7 +71,7 @@ object Selection {
       case class Format[A](regex: Regex)(val f: String => A)
 
       object Format {
-        implicit val string = new Format[String]("""'[^']*'"""r)(x => x.substring(1, x.length - 1))
+        implicit val string = new Format[String]("""\w*"""r)(identity)
         implicit val int = new Format[Int]("""\d*"""r)(_.toInt)
       }
     }
