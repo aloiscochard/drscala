@@ -2,6 +2,7 @@ package drscala
 package rules
 
 import PhaseId._
+import Random._
 
 object StdRules extends RuleSet("std") with RuleSet.DSL {
   override def rules = {
@@ -60,11 +61,15 @@ object StdRules extends RuleSet("std") with RuleSet.DSL {
     } ++
     Seq(
       StyleCheck("EmptyLines") { lines =>
+        def aBigAnimal = ofTwo("an :elephant:", "a :whale:")
         val (count, xs) = lines.foldLeft((0, Seq.empty[Position])) { case ((count, xs), (line, pos)) =>
           if (line.trim.isEmpty) (count + 1) ->  xs
           else 0 -> { if (count > 1) (pos(1) +: xs ) else xs }
         }
-        xs.map { case (line, column) => (line - 1, column) -> "Are these extra empty lines really needed?" }
+        xs.map { case (line, column) => (line - 1, column) -> (
+          s"There is enough room for $aBigAnimal!\n" +
+          "Are these extra empty lines really needed?"
+        )}
       },
       StyleCheck("Semicolons")(_.collect {
         case (code, pos) if code.trim.endsWith(";") =>
