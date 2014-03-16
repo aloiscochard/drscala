@@ -7,22 +7,7 @@ import scala.tools.nsc.{Global, Phase}
 trait HealthCake {
   val global: Global
 
-  import global._
-
-  type Column = Int
-  type Line = Int
-  type Position = (Line, Column)
-  type Message = String
-
-  sealed abstract class PhaseId(val name: String)
-
-  object PhaseId {
-    case object Typer extends PhaseId("typer")
-    case object Parser extends PhaseId("parser")
-
-    def values = Set(Typer, Parser)
-    def fromString(name: String): Option[PhaseId] = values.find(_.name == name)
-  }
+  import global.{Position => _, _}
 
   sealed trait Doctor { 
     def name: String

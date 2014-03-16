@@ -11,13 +11,14 @@ import doctors._
 import Selection._
 
 class CompilerPlugin(val global: Global) extends Plugin with HealthCake 
-    with StdComponent with WartComponent { import global.{Lazy => _, _}
+    with RuleComponent with WartComponent { import global.{Lazy => _, Position => _,  _}
 
   implicit val ec: ExecutionContext = ExecutionContext.global
 
   trait Checkup extends PluginComponent {
-    import global._
-    def checkup: CompilerPlugin.this.global.CompilationUnit => Seq[(CompilerPlugin.this.Position, String)]
+    import global.{Position => _, _}
+
+    def checkup: CompilerPlugin.this.global.CompilationUnit => Seq[(Position, String)]
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
@@ -70,9 +71,12 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
   val name = "drscala"
   val description = "A doctor for your code"
 
-  val doctors = Lazy(Seq(StdLib, StdStyle) ++ Settings.warts.flatMap(_.nonEmpty).map(WartDoctor.fromExp).toSeq)
-  val sementics = doctors.map(_.collect { case x: Doctor.Sementic => x})
-  val styles = doctors.map(_.collect { case x: Doctor.Style => x})
+  val doctors = Lazy {
+    (ruleSets.values.flatMap(RuleDoctor.fromRuleSet(_)(Exp.All())) ++ Settings.warts.flatMap(_.nonEmpty).map(WartDoctor.fromExp)).toSeq
+  }
+
+  val sementics = Lazy(doctors.value.collect { case x: Doctor.Sementic => x})
+  val styles = Lazy(doctors.value.collect { case x: Doctor.Style => x})
 
   val components = 
     if (active) 
@@ -151,7 +155,7 @@ class CompilerPlugin(val global: Global) extends Plugin with HealthCake
 
     trace(s"""DrScala (warn=${Settings.warn}, github=${Settings.github}, drscala.pr=${GitHub.pullRequestId}""")
     trace(s"Warts: $warts")
-    trace("Doctors" + doctors.value.map(_.name).mkString(","))
+    trace(s"Doctors: ${doctors.value.map(_.name).mkString(",")}")
 
     reporterOption = reporterInit
     trace(s"Scope = ${reporterOption.map(_.scope)}")

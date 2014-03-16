@@ -4,7 +4,7 @@ package doctors
 import org.brianmckenna.wartremover.{WartTraverser, WartUniverse}
 
 trait WartComponent { self: HealthCake =>
-  import self.global._
+  import self.global.{Position => _, _}
   import PhaseId._
 
   val IsDisabled = new Suffix(" is disabled")

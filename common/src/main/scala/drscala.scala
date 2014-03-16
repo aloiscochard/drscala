@@ -1,7 +1,11 @@
 package object drscala {
-  implicit class RichAny[A](x: A) {
-    def const[B]: B => A = _ => x
-  }
+  implicit class RichAny[A](x: A) { def const[B]: B => A = _ => x }
+
+  type Column = Int
+  type Line = Int
+  type Position = (Line, Column)
+  type Message = String
+  type Universe = reflect.api.Universe
 
   class Prefix(value: String) { def unapply(xs: String): Option[String] = if (xs.startsWith(value)) Some(xs.drop(value.size)) else None }
   class Suffix(value: String) { def unapply(xs: String): Option[String] = if (xs.endsWith(value)) Some(xs.take(xs.size - value.size)) else None }
@@ -9,7 +13,6 @@ package object drscala {
   trait Lazy[A] { self =>
     protected def get: A
     def value: A = get
-    def map[B](f: A => B): Lazy[B] = new Lazy[B] { override def get: B = f(self.get) }
   }
 
   object Lazy { 
